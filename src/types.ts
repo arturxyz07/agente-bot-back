@@ -1,5 +1,4 @@
 export type ModelProvider = "anthropic" | "google" | "openai" | "mistral";
-
 export type ModelStatus = "available" | "unavailable" | "deprecated";
 
 export interface AIModel {
@@ -14,16 +13,28 @@ export interface AIModel {
   tags: string[];
 }
 
-export interface Message {
-  id: string;
-  role: "user" | "assistant" | "system";
+export interface ChatMessagePayload {
+  role: "user" | "assistant";
   content: string;
-  createdAt: Date;
-  modelId?: string;
 }
 
 export interface ChatRequest {
-  messages: { role: "user" | "assistant"; content: string }[];
+  messages: ChatMessagePayload[];
   modelId: string;
   conversationId?: string;
+}
+
+export interface AuthRequest {
+  email: string;
+  password: string;
+  name?: string;
+}
+
+// Estende o Request do Express para incluir o userId autenticado
+declare global {
+  namespace Express {
+    interface Request {
+      userId?: string;
+    }
+  }
 }
