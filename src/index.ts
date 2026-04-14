@@ -369,8 +369,6 @@ app.post("/api/chat", authMiddleware, async (req: Request, res: Response) => {
 // START
 // ─────────────────────────────────────────────────────────────────────────────
 
-connectDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`✅ agente-bot backend rodando em http://localhost:${PORT}`);
-  });
-});
+connectDB();
+
+export default app;
