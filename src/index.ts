@@ -4,6 +4,7 @@ import cors from "cors";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
+import os from "os";
 import cloudinary from "./cloudinary";
 
 import { connectDB, User, Conversation } from "./db";
@@ -26,6 +27,91 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 app.use(cors());
 app.use(express.json());
+
+type ServiceState = "operational" | "degraded" | "unavailable";
+
+interface HealthSnapshot {
+  status: "healthy" | "degraded" | "unhealthy";
+  timestamp: string;
+  uptimeSeconds: number;
+  version: string;
+  services: {
+    api: { status: ServiceState; responseTimeMs: number };
+    database: { status: ServiceState; responseTimeMs: number | null };
+  };
+  resources: {
+    processMemoryMb: number;
+    processHeapUsagePercent: number;
+    systemMemoryUsagePercent: number;
+  };
+}
+
+async function getHealthSnapshot(): Promise<HealthSnapshot> {
+  const startedAt = performance.now();
+  const dbStartedAt = performance.now();
+  let databaseStatus: ServiceState = "unavailable";
+  let databaseResponseTimeMs: number | null = null;
+
+  if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+    try {
+      await mongoose.connection.db.admin().ping();
+      databaseStatus = "operational";
+      databaseResponseTimeMs = Math.round(performance.now() - dbStartedAt);
+    } catch {
+      databaseStatus = "degraded";
+      databaseResponseTimeMs = Math.round(performance.now() - dbStartedAt);
+    }
+  } else if (mongoose.connection.readyState === 2) {
+    databaseStatus = "degraded";
+  }
+
+  const memory = process.memoryUsage();
+  const heapUsage = memory.heapTotal > 0 ? (memory.heapUsed / memory.heapTotal) * 100 : 0;
+  const totalMemory = os.totalmem();
+  const systemMemoryUsage = totalMemory > 0 ? ((totalMemory - os.freemem()) / totalMemory) * 100 : 0;
+  const status = databaseStatus === "operational"
+    ? "healthy"
+    : databaseStatus === "degraded" ? "degraded" : "unhealthy";
+
+  return {
+    status,
+    timestamp: new Date().toISOString(),
+    uptimeSeconds: Math.floor(process.uptime()),
+    version: process.env.npm_package_version || "1.0.0",
+    services: {
+      api: {
+        status: "operational",
+        responseTimeMs: Math.round(performance.now() - startedAt),
+      },
+      database: {
+        status: databaseStatus,
+        responseTimeMs: databaseResponseTimeMs,
+      },
+    },
+    resources: {
+      processMemoryMb: Math.round(memory.rss / 1024 / 1024),
+      processHeapUsagePercent: Math.round(heapUsage * 10) / 10,
+      systemMemoryUsagePercent: Math.round(systemMemoryUsage * 10) / 10,
+    },
+  };
+}
+
+// Endpoint público e sem dados sensíveis para monitoramento operacional.
+app.get("/api/health", async (_req: Request, res: Response) => {
+  res.setHeader("Cache-Control", "no-store, max-age=0");
+
+  try {
+    const snapshot = await getHealthSnapshot();
+    res.status(snapshot.status === "unhealthy" ? 503 : 200).json(snapshot);
+  } catch (error) {
+    console.error("Erro ao coletar saúde do servidor:", error);
+    res.status(503).json({
+      status: "unhealthy",
+      timestamp: new Date().toISOString(),
+      error: "Não foi possível verificar a saúde do servidor.",
+    });
+  }
+});
 
 // 1. Analisa a intenção do usuário usando um modelo rápido
 async function extractWeatherLocation(prompt: string): Promise<string | null> {
