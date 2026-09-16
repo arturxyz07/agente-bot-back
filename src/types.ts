@@ -44,6 +44,7 @@ export interface ChatRequest {
 }
 
 export interface AuthRequest {
+  recaptchaToken: string;
   email: string;
   password: string;
   name?: string;

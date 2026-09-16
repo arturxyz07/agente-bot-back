@@ -15,6 +15,7 @@ import {
   streamOpenAIResponse,
 } from "./ai-providers";
 import { authMiddleware } from "./authMiddleware";
+import { requireRecaptcha } from "./recaptcha";
 import { ChatRequest, AuthRequest, ImageAttachment } from "./types";
 
 const app = express();
@@ -269,7 +270,7 @@ async function validateImages(
 // ─────────────────────────────────────────────────────────────────────────────
 
 // POST /api/auth/register
-app.post("/api/auth/register", async (req: Request, res: Response) => {
+app.post("/api/auth/register", requireRecaptcha, async (req: Request, res: Response) => {
   try {
     const { name, email, password }: AuthRequest = req.body;
 
@@ -305,7 +306,7 @@ app.post("/api/auth/register", async (req: Request, res: Response) => {
 });
 
 // POST /api/auth/login
-app.post("/api/auth/login", async (req: Request, res: Response) => {
+app.post("/api/auth/login", requireRecaptcha, async (req: Request, res: Response) => {
   try {
     const { email, password }: AuthRequest = req.body;
 
