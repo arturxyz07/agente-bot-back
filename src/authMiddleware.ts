@@ -12,8 +12,10 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
   const token = authHeader.split(" ")[1];
 
   try {
-    const secret = process.env.JWT_SECRET || "secret";
+    const secret = process.env.JWT_SECRET;
+    if (!secret) throw new Error("JWT_SECRET não configurada.");
     const payload = jwt.verify(token, secret) as { userId: string };
+    if (typeof payload.userId !== "string" || !/^[a-f\d]{24}$/i.test(payload.userId)) throw new Error("Token inválido.");
     req.userId = payload.userId;
     next();
   } catch {

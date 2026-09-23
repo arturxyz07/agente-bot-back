@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "seed:admin": "npm run build && node dist/seed-admin.js",
+    "test": "npm run build && node --test test/*.test.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.126.0",
@@ -17,13 +19,16 @@
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.13.2",
-    "openai": "^6.33.0"
+    "multer": "^2.4.0",
+    "openai": "^6.33.0",
+    "pdf-parse": "^2.4.5"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.9",
+    "@types/multer": "^2.2.0",
     "@types/node": "^20.0.0",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.0.0"

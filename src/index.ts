@@ -15,12 +15,14 @@ import {
   streamOpenAIResponse,
 } from "./ai-providers";
 import { authMiddleware } from "./authMiddleware";
+import { adminRoutes } from "./adminRoutes";
 import { requireRecaptcha } from "./recaptcha";
 import { ChatRequest, AuthRequest, ImageAttachment } from "./types";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || "secret";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error("Configure JWT_SECRET antes de iniciar o servidor.");
 const ALLOWED_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const MAX_IMAGES_PER_MESSAGE = 10;
 const MAX_IMAGES_PER_REQUEST = 20;
@@ -28,6 +30,7 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 app.use(cors());
 app.use(express.json());
+app.use("/api/admin", adminRoutes);
 
 type ServiceState = "operational" | "degraded" | "unavailable";
 
@@ -297,7 +300,7 @@ app.post("/api/auth/register", requireRecaptcha, async (req: Request, res: Respo
 
     res.status(201).json({
       token,
-      user: { id: user._id, name: user.name, email: user.email },
+      user: { id: user._id, name: user.name, email: user.email, role: user.role || "user" },
     });
   } catch (err) {
     console.error(err);
@@ -331,7 +334,7 @@ app.post("/api/auth/login", requireRecaptcha, async (req: Request, res: Response
 
     res.json({
       token,
-      user: { id: user._id, name: user.name, email: user.email },
+      user: { id: user._id, name: user.name, email: user.email, role: user.role || "user" },
     });
   } catch (err) {
     console.error(err);
@@ -347,7 +350,7 @@ app.get("/api/auth/me", authMiddleware, async (req: Request, res: Response) => {
       res.status(404).json({ error: "Usuário não encontrado." });
       return;
     }
-    res.json({ user: { id: user._id, name: user.name, email: user.email } });
+    res.json({ user: { id: user._id, name: user.name, email: user.email, role: user.role || "user" } });
   } catch {
     res.status(500).json({ error: "Erro interno." });
   }
@@ -664,5 +667,9 @@ app.post("/api/chat", authMiddleware, async (req: Request, res: Response) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 connectDB();
+
+if (require.main === module) {
+  app.listen(PORT, () => console.log(`API disponível na porta ${PORT}`));
+}
 
 export default app;
