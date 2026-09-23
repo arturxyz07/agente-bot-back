@@ -1,6 +1,5 @@
 import "dotenv/config";
 import express, { Request, Response } from "express";
-import cors from "cors";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
@@ -28,7 +27,6 @@ const MAX_IMAGES_PER_MESSAGE = 10;
 const MAX_IMAGES_PER_REQUEST = 20;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
-app.use(cors());
 app.use(express.json());
 app.use("/api/admin", adminRoutes);
 
