@@ -15,6 +15,7 @@ import {
 } from "./ai-providers";
 import { authMiddleware } from "./authMiddleware";
 import { adminRoutes } from "./adminRoutes";
+import { createCorsMiddleware } from "./corsMiddleware";
 import { requireRecaptcha } from "./recaptcha";
 import { ChatRequest, AuthRequest, ImageAttachment } from "./types";
 
@@ -27,6 +28,7 @@ const MAX_IMAGES_PER_MESSAGE = 10;
 const MAX_IMAGES_PER_REQUEST = 20;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
+app.use(createCorsMiddleware());
 app.use(express.json());
 app.use("/api/admin", adminRoutes);
 

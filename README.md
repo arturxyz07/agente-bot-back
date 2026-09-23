@@ -37,6 +37,12 @@ Esta implementação faz recuperação por ID e contexto integral, como solicita
 
 ## Rotas protegidas
 
+### Frontend em outro domínio (CORS)
+
+Configure `CORS_ALLOWED_ORIGINS=https://agente-bot-phi.vercel.app,http://localhost:3000` no backend. Esses são também os valores padrão. Use origens completas, com protocolo, separadas por vírgula. O middleware responde ao preflight `OPTIONS` antes da autenticação e inclui CORS nas respostas de erro. `RECAPTCHA_ALLOWED_HOSTNAMES` é outra configuração: nela use somente o hostname, por exemplo `agente-bot-phi.vercel.app`, sem protocolo.
+
+O leitor de PDF e `@napi-rs/canvas` são carregados somente ao enviar PDFs. A dependência nativa é importada explicitamente para inclusão no pacote serverless. Uma falha nesse leitor não impede a inicialização da API ou o login. Instale as dependências opcionais de plataforma no build (não use `--omit=optional`) e faça novo deploy após atualizar o lockfile.
+
 Todas exigem `Authorization: Bearer <token>` e papel `admin`, consultado no banco a cada requisição. Usuários comuns recebem 403; sem token válido, 401. Todos os admins compartilham a base documental.
 
 | Método | Rota | Entrada / saída |

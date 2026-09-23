@@ -1,5 +1,4 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { PDFParse } from "pdf-parse";
 
 export const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
 export const MAX_DOCUMENT_CHARS = 200_000;
@@ -24,6 +23,13 @@ export async function extractDocumentText(buffer: Buffer, filename: string): Pro
     if (/[\x00-\x08\x0e-\x1f]/.test(text)) throw new DocumentError("O arquivo não contém texto válido.");
   } else if (/\.pdf$/i.test(filename)) {
     if (buffer.subarray(0, 5).toString() !== "%PDF-") throw new DocumentError("Arquivo PDF inválido.");
+    // Load native PDF dependencies only for PDF uploads, never during API startup.
+    // The explicit canvas import also makes the serverless bundler trace its binaries.
+    const canvas = await import("@napi-rs/canvas");
+    for (const name of ["DOMMatrix", "ImageData", "Path2D"] as const) {
+      if (!(name in globalThis)) Object.assign(globalThis, { [name]: canvas[name] });
+    }
+    const { PDFParse } = await import("pdf-parse");
     const parser = new PDFParse({ data: buffer });
     try {
       text = (await parser.getText()).pages.map((page) => page.text).join("\n\n");
