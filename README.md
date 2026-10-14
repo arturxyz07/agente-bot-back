@@ -54,6 +54,21 @@ Todas exigem `Authorization: Bearer <token>` e papel `admin`, consultado no banc
 
 Limites: 4 MiB por arquivo, 200.000 caracteres extraídos e 4.000 caracteres por pergunta. Documentos grandes são rejeitados, nunca truncados silenciosamente. TXT exige UTF-8. PDFs corrompidos, protegidos ou sem texto extraível são rejeitados; não há OCR de imagens. Arquivos originais não são persistidos. Configure limites de infraestrutura e tempo de execução compatíveis com a extração e a chamada de até 60 segundos ao Gemini. `RAG_GEMINI_MODEL` permite selecionar o modelo disponível na sua conta Google.
 
+## Sala Pública em tempo real (Socket.io)
+
+O Socket.io usa o mesmo servidor HTTP do Express (`src/realtime.ts`), na mesma porta e com as origens de `CORS_ALLOWED_ORIGINS`.
+
+- **Autenticação:** o cliente envia o JWT em `io(URL, { auth: { token } })`. O servidor valida o token e busca o nome no MongoDB; sem token válido a conexão é recusada.
+- **Broadcast:** o evento `novaMensagem` (`{ texto }`) é retransmitido a todos com `io.emit("mensagemRecebida", { id, autor, autorId, texto, tipo, criadoEm })`. O ack responde `{ ok, error? }`.
+- **Gatilho da IA:** se o texto contém `@gemini` ou `@bot`, o servidor chama o Gemini com as últimas 20 mensagens da sala e emite a resposta como `🤖 Moderador Gemini`. Sem o gatilho, a IA fica em silêncio.
+- **Moderação:** palavrões são censurados com `*` e o moderador emite uma advertência.
+- **Desafio Hacker:** `usuariosOnline` (contador de conexões) e `digitando`/`usuarioDigitando` (“Fulano está digitando...”).
+- **Limites:** 1.000 caracteres por mensagem, intervalo mínimo de 300 ms e uma chamada de IA por vez por conexão.
+
+O histórico da sala fica em memória (últimas 20 mensagens) e é enviado no evento `historico` ao conectar; ele é perdido ao reiniciar o servidor.
+
+**Deploy:** funções serverless da Vercel não mantêm conexões WebSocket. Publique o backend em um serviço com processo contínuo, como o Render (`npm run build` e `npm start`), e aponte `NEXT_PUBLIC_API_URL` (ou `NEXT_PUBLIC_SOCKET_URL`) do frontend para essa URL.
+
 ## Validação
 
-`npm test` compila e executa testes de autenticação/autorização, upload, extração, consulta e isolamento do contexto com serviços externos simulados. O uso real exige MongoDB, reCAPTCHA e chave Google válidos.
+`npm test` compila e executa testes do WebSocket (auth, broadcast, gatilho da IA, censura, contador e digitação), de autenticação/autorização, upload, extração, consulta e isolamento do contexto com serviços externos simulados. O uso real exige MongoDB, reCAPTCHA e chave Google válidos.

@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import os from "os";
+import http from "http";
 import cloudinary from "./cloudinary";
 
 import { connectDB, User, Conversation } from "./db";
@@ -17,6 +18,7 @@ import { authMiddleware } from "./authMiddleware";
 import { adminRoutes } from "./adminRoutes";
 import { createCorsMiddleware } from "./corsMiddleware";
 import { requireRecaptcha } from "./recaptcha";
+import { attachRealtime } from "./realtime";
 import { ChatRequest, AuthRequest, ImageAttachment } from "./types";
 
 const app = express();
@@ -669,7 +671,10 @@ app.post("/api/chat", authMiddleware, async (req: Request, res: Response) => {
 connectDB();
 
 if (require.main === module) {
-  app.listen(PORT, () => console.log(`API disponível na porta ${PORT}`));
+  // O Socket.io "abraça" o mesmo servidor HTTP do Express (REST + WebSocket na mesma porta).
+  const server = http.createServer(app);
+  attachRealtime(server);
+  server.listen(PORT, () => console.log(`API e WebSocket disponíveis na porta ${PORT}`));
 }
 
 export default app;
