@@ -1,10 +1,15 @@
 import { Request, Response, NextFunction } from "express";
 
+// Aceita "https://host/", aspas ou espaços colados por engano nas variáveis de ambiente.
+export function normalizeHostname(value: string) {
+  return value.trim().replace(/^["']|["']$/g, "").replace(/^[a-z]+:\/\//i, "").replace(/[/:].*$/, "").toLowerCase();
+}
+
 // Fail closed: missing configuration or verifier outages never bypass CAPTCHA.
 export async function requireRecaptcha(req: Request, res: Response, next: NextFunction) {
   const secret = process.env.RECAPTCHA_SECRET_KEY?.trim();
   const hostnames = (process.env.RECAPTCHA_ALLOWED_HOSTNAMES || "")
-    .split(",").map((host) => host.trim().toLowerCase()).filter(Boolean);
+    .split(",").map(normalizeHostname).filter(Boolean);
   if (!secret || !hostnames.length) {
     res.status(503).json({ error: "Verificação de segurança indisponível. Tente novamente mais tarde." });
     return;
@@ -32,9 +37,16 @@ export async function requireRecaptcha(req: Request, res: Response, next: NextFu
     if (result?.["error-codes"]?.some((code) => ["missing-input-secret", "invalid-input-secret"].includes(code))) {
       throw new Error("Verifier misconfigured");
     }
-    if (result?.success !== true || typeof result.hostname !== "string" ||
-        !hostnames.includes(result.hostname.toLowerCase())) {
-      res.status(403).json({ error: "Verificação inválida ou expirada. Resolva o reCAPTCHA novamente." });
+    // Motivo sem segredos (códigos do Google e hostname do token) para diagnosticar a configuração.
+    let motivo: string | null = null;
+    if (result?.success !== true) {
+      motivo = `google: ${result?.["error-codes"]?.join(", ") || "sem código"}`;
+    } else if (typeof result.hostname !== "string" || !hostnames.includes(result.hostname.toLowerCase())) {
+      motivo = `hostname "${result.hostname ?? ""}" fora de RECAPTCHA_ALLOWED_HOSTNAMES (${hostnames.join(", ")})`;
+    }
+    if (motivo) {
+      console.warn(`reCAPTCHA recusado: ${motivo}`);
+      res.status(403).json({ error: "Verificação inválida ou expirada. Resolva o reCAPTCHA novamente.", motivo });
       return;
     }
   } catch {
