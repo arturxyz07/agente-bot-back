@@ -21,6 +21,13 @@ import { requireRecaptcha } from "./recaptcha";
 import { attachRealtime } from "./realtime";
 import { ChatRequest, AuthRequest, ImageAttachment } from "./types";
 
+// Sprint 8 — Centro de Comando. Módulos CommonJS fora do rootDir do tsc
+// (models/ e routes/ na raiz); carregados via require em tempo de execução.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const Mensagem = require("../models/Mensagem");
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const analyticsRoutes = require("../routes/analyticsRoutes");
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -33,6 +40,7 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 app.use(createCorsMiddleware());
 app.use(express.json());
 app.use("/api/admin", adminRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 type ServiceState = "operational" | "degraded" | "unavailable";
 
@@ -594,6 +602,9 @@ app.post("/api/chat", authMiddleware, async (req: Request, res: Response) => {
 
     await conv.save();
 
+    // Sprint 8: espelha a mensagem do usuário na coleção Mensagem (telemetria). Não-fatal.
+    Mensagem.create({ usuario: req.userId, role: "user", content: originalContent, tokensGastos: 0 }).catch(() => {});
+
     // 💉 INJETA os dados do clima (se houver) no array em memória que vai ser processado pela IA.
     if (systemContext) {
       messages[messages.length - 1].content = originalContent + systemContext;
@@ -631,6 +642,8 @@ app.post("/api/chat", authMiddleware, async (req: Request, res: Response) => {
       }
 
       // 💾 salva resposta da IA
+      // Sprint 8 (REQ-004): tokens gastos = total de entrada + saída reportado pelo provedor.
+      const tokensGastos = usage.inputTokens + usage.outputTokens;
       if (fullContent) {
         conv.messages.push({
           role: "assistant",
@@ -640,6 +653,9 @@ app.post("/api/chat", authMiddleware, async (req: Request, res: Response) => {
 
         conv.updatedAt = new Date();
         await conv.save();
+
+        // Espelha a resposta na coleção Mensagem com o custo em tokens (telemetria). Não-fatal.
+        Mensagem.create({ usuario: req.userId, role: "assistant", content: fullContent, tokensGastos }).catch(() => {});
       }
 
       const doneData = JSON.stringify({

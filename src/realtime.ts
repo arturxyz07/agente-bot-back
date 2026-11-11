@@ -34,7 +34,11 @@ interface RoomUser {
   name: string;
 }
 
-export type BotReplier = (pergunta: string, historico: RoomMessage[]) => Promise<string>;
+// Sprint 8 (Desafio Hacker): `meta` é um objeto opcional de saída. Se fornecido,
+// o replier preenche meta.totalTokens com os tokens gastos pela IA, sem mudar o
+// valor de retorno (continua sendo o texto da resposta).
+export interface BotReplyMeta { totalTokens?: number }
+export type BotReplier = (pergunta: string, historico: RoomMessage[], meta?: BotReplyMeta) => Promise<string>;
 
 export function isBotInvoked(texto: string) {
   return TRIGGER.test(texto);
@@ -53,7 +57,7 @@ export function censor(texto: string) {
   return { texto: censored, found };
 }
 
-export async function askGeminiModerator(pergunta: string, historico: RoomMessage[]) {
+export async function askGeminiModerator(pergunta: string, historico: RoomMessage[], meta?: BotReplyMeta) {
   const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!key) throw new Error("Gemini não configurado.");
   const model = new GoogleGenerativeAI(key).getGenerativeModel({
@@ -68,6 +72,8 @@ export async function askGeminiModerator(pergunta: string, historico: RoomMessag
   ] }] });
   const answer = result.response.text().trim();
   if (!answer) throw new Error("Gemini retornou uma resposta vazia.");
+  // Sprint 8: tokens gastos pelo moderador (Tokens = Dinheiro).
+  if (meta) meta.totalTokens = result.response.usageMetadata?.totalTokenCount ?? 0;
   return answer;
 }
 
@@ -147,7 +153,10 @@ export function attachRealtime(server: HttpServer, options: { askBot?: BotReplie
       botPending = true;
       io.emit("usuarioDigitando", { userId: BOT_ID, nome: BOT_NAME, digitando: true });
       try {
-        botMessage(await askBot(texto, historico.slice()));
+        const meta: BotReplyMeta = {};
+        botMessage(await askBot(texto, historico.slice(), meta));
+        // Sprint 8 (Desafio Hacker): o gráfico do dashboard sobe sozinho em tempo real.
+        if (meta.totalTokens) io.emit("novoGastoDeToken", meta.totalTokens);
       } catch (error) {
         console.error("Erro no moderador Gemini:", error);
         botMessage("Desculpe, não consegui responder agora. Tente novamente em instantes.");
